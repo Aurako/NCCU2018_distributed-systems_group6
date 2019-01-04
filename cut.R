@@ -5,14 +5,14 @@ data <- read.csv(args[1])
 datalen=nrow(data)
 print(datalen)
 
-if (datalen>1048000){
-  num=as.integer(datalen/1048000)
-    for (i in c(1:num)){
+if (datalen>5000000){
+  num=as.integer(datalen/5000000)
+    for (i in c(1:num+2)){
       name=paste0("datapart",i,".csv")
       print(name)
-      finish<-i*1048000
+      finish<-i*5000000
       print(finish)
-      start<-1+1048000*(i-1)
+      start<-1+5000000*(i-1)
       print(start)
       datapi<-data[start:finish,]
       print(datapi)
