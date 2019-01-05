@@ -16,23 +16,33 @@ if __name__ == '__main__':
 	DT.persist()
 
 	numin = DT.groupBy("inputs_input_pubkey_base58").count().sort(desc("count")) #count user's transaction number
+	numin = numin.selectExpr("inputs_input_pubkey_base58 as address","count as incount")
 	numin.show()
-	numinavg=numin.select(func.avg("count")).collect()
+	numinavg=numin.select(func.avg("incount")).collect()
 	print(numinavg)
 	
 	numout = DT.groupBy("outputs_output_pubkey_base58").count().sort(desc("count")) #count user's transaction number
+	numout = numout.selectExpr("outputs_output_pubkey_base58 as address","count as outcount")
 	numout.show()
-	numoutavg=numout.select(func.avg("count")).collect()
+	numoutavg=numout.select(func.avg("outcount")).collect()
 	print(numoutavg)
 
-	volume = DT.groupBy("inputs_input_pubkey_base58").agg(func.max("outputs_output_satoshis"),func.min("outputs_output_satoshis"),func.avg("outputs_output_satoshis"), func.sum("outputs_output_satoshis")).sort(desc("sum(outputs_output_satoshis)"))	#count user's total amount
+	#volume = DT.groupBy("inputs_input_pubkey_base58").agg(func.max("outputs_output_satoshis"),func.min("outputs_output_satoshis"),func.avg("outputs_output_satoshis"), func.sum("outputs_output_satoshis")).sort(desc("sum(outputs_output_satoshis)"))	#count user's total amount
+	volume = DT.groupBy("inputs_input_pubkey_base58").sum("outputs_output_satoshis").sort(desc("sum(outputs_output_satoshis)"))
 	volume.show()
-	volumeavg=DT.select(func.avg("outputs_output_satoshis")).collect()
+	volumeavg=DT.select(func.avg("outputs_output_satoshis")).collect()#
 	print(volumeavg)
 
+	choosevolume=DT.where("outputs_output_satoshis>=56839628")
+	choosevolume.show()
+	choosein=numin.where("incount>=6")
+	choosein.show()
+	chooseout=numout.where("outcount>=4")
+	chooseout.show()
 
-
-
+	testing=numin.select('address').intersect(numout.select('address'))
+	testing.show()
+	
 	spark.stop()
 	print('Done!')
 
