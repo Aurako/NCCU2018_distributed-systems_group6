@@ -5,6 +5,8 @@ import pyspark.sql.functions as func
 from pyspark.sql.types import IntegerType
 from pyspark.sql.functions import desc
 from pyspark.sql.functions import sum
+from pyspark.sql.functions import col,size,isnan
+from pyspark.sql.types import *
 
 if __name__ == '__main__':
 	spark = pyspark.SparkContext()
@@ -17,39 +19,50 @@ if __name__ == '__main__':
 
 	choosevolume=DT.select("inputs_input_pubkey_base58","outputs_output_pubkey_base58","outputs_output_satoshis").sort(desc("outputs_output_satoshis"))# find out each record of satoshis<56839628
 	choosevolume=choosevolume.where("outputs_output_satoshis<=56839628")
-	choosevolume=choosevolume.selectExpr("inputs_input_pubkey_base58 as in_address","outputs_output_pubkey_base58 as out_address","outputs_output_satoshis as out_satoshis")
-	choosevolume.show()
+	choosevolume=choosevolume.selectExpr("inputs_input_pubkey_base58 as pay_address","outputs_output_pubkey_base58 as receipt_address","outputs_output_satoshis as satoshis")
+	#choosevolume.show()
 
 	inavg = DT.groupBy("inputs_input_pubkey_base58").count().sort(desc("count"))
 	numinavg=inavg.select(func.avg("count")).collect()
-	print(numinavg)
+	#print(numinavg)
 	
 	numout = DT.groupBy("outputs_output_pubkey_base58").count().sort(desc("count"))
 	numoutavg=numout.select(func.avg("count")).collect()
-	print(numoutavg)
+	#print(numoutavg)
 
-	numin = choosevolume.groupBy("in_address").count().sort(desc("count")) #count user's in transaction number
+	numin = choosevolume.groupBy("pay_address").count().sort(desc("count")) #count user's pay times
 	numin = numin.where("count<=6")
-	numin = numin.selectExpr("in_address as address","count as incount")
-	numin.show()
+	numin = numin.selectExpr("pay_address as address","count as incount")
+	#numin.show()
 	
-	numout = choosevolume.groupBy("out_address").count().sort(desc("count")) #count user's out transaction number
+	numout = choosevolume.groupBy("receipt_address").count().sort(desc("count")) #count user's receipt times
 	numout = numout.where("count<=4")
-	numout = numout.selectExpr("out_address as address","count as outcount")
-	numout.show()
+	numout = numout.selectExpr("receipt_address as address","count as outcount")
+	#numout.show()
 	
 
-	#volume = DT.groupBy("inputs_input_pubkey_base58").agg(func.max("outputs_output_satoshis"),func.min("outputs_output_satoshis"),func.avg("outputs_output_satoshis"), func.sum("outputs_output_satoshis")).sort(desc("sum(outputs_output_satoshis)"))	#count user's total amount
-	#volume = DT.groupBy("inputs_input_pubkey_base58").sum("outputs_output_satoshis").sort(desc("sum(outputs_output_satoshis)")) #sum satashis per in_address
-	#volume.show()
+	###volume = DT.groupBy("inputs_input_pubkey_base58").agg(func.max("outputs_output_satoshis"),func.min("outputs_output_satoshis"),func.avg("outputs_output_satoshis"), func.sum("outputs_output_satoshis")).sort(desc("sum(outputs_output_satoshis)"))	#count user's total amount
+	###volume = DT.groupBy("inputs_input_pubkey_base58").sum("outputs_output_satoshis").sort(desc("sum(outputs_output_satoshis)")) #sum satashis per pay_address
+	###volume.show()
 
 	volumeavg=DT.select(func.avg("outputs_output_satoshis")).collect()
-	print(volumeavg)
+	#print(volumeavg)
 
-	personal=numin.select('address').intersect(numout.select('address')) #in<=4 and out<=6 and satoshi<=5683962
-	personal.show()
+	personal=numin.select('address').intersect(numout.select('address')) #pay<=4 and receipt<=6 and satoshi<=5683962
+	personal.show() #table of personal address
 	numofpersonal=personal.count()
-	print(numofpersonal)
+	print(numofpersonal) #numbers of personal address
+
+
+	##pool=DT.where(size(col("outputs_output_pubkey_base58"))==0)
+	##pool=DT.filter(DT.outputs_output_pubkey_base58.like('\n%'))
+	#pool=DT.filter((DT["outputs_output_pubkey_base58"] == "") | DT["outputs_output_pubkey_base58"].isNull() | isnan(DT["outputs_output_pubkey_base58"])).sort(desc("outputs_output_satoshis"))
+	pool=DT.filter((DT["inputs_input_pubkey_base58"] == "") | DT["inputs_input_pubkey_base58"].isNull() | isnan(DT["inputs_input_pubkey_base58"])).sort(desc("outputs_output_satoshis"))
+	pool=pool.filter((DT["outputs_output_satoshis"] >= 1250000000)&(DT["outputs_output_satoshis"] <= 1450000000))
+	pool=pool.groupBy("outputs_output_pubkey_base58").count().sort(desc("count"))
+	pool.show(50) #table of mining pool address and count
+	numofpool=pool.count()
+	print(numofpool) #numbers of mining pool address
 
 	spark.stop()
 	print('Done!')
