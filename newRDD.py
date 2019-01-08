@@ -2,11 +2,13 @@
 import datetime
 import pyspark
 import pyspark.sql.functions as func
+
 from pyspark.sql.types import IntegerType
 from pyspark.sql.functions import desc
 from pyspark.sql.functions import sum
 from pyspark.sql.functions import col,size,isnan
 from pyspark.sql.types import *
+from pyspark.sql.functions import lower
 
 if __name__ == '__main__':
 	spark = pyspark.SparkContext()
@@ -56,13 +58,20 @@ if __name__ == '__main__':
 
 	##pool=DT.where(size(col("outputs_output_pubkey_base58"))==0)
 	##pool=DT.filter(DT.outputs_output_pubkey_base58.like('\n%'))
-	#pool=DT.filter((DT["outputs_output_pubkey_base58"] == "") | DT["outputs_output_pubkey_base58"].isNull() | isnan(DT["outputs_output_pubkey_base58"])).sort(desc("outputs_output_satoshis"))
+	pool=DT.filter((DT["outputs_output_pubkey_base58"] == "") | DT["outputs_output_pubkey_base58"].isNull() | isnan(DT["outputs_output_pubkey_base58"])).sort(desc("outputs_output_satoshis"))
 	pool=DT.filter((DT["inputs_input_pubkey_base58"] == "") | DT["inputs_input_pubkey_base58"].isNull() | isnan(DT["inputs_input_pubkey_base58"])).sort(desc("outputs_output_satoshis"))
 	pool=pool.filter((DT["outputs_output_satoshis"] >= 1250000000)&(DT["outputs_output_satoshis"] <= 1450000000))
 	pool=pool.groupBy("outputs_output_pubkey_base58").count().sort(desc("count"))
-	pool.show(50) #table of mining pool address and count
+	pool.show() #table of mining pool address and count
 	numofpool=pool.count()
 	print(numofpool) #numbers of mining pool address
+
+
+	casino=DT.where((lower(DT["outputs_output_pubkey_base58"]).like('1dice%')) | (lower(DT["outputs_output_pubkey_base58"]).like('%lucky%'))) #|(DT.inputs_input_pubkey_base58.like('1dice%')))
+	casino=casino.groupBy("outputs_output_pubkey_base58").count().sort(desc("count"))
+	casino.show()
+	numofcasino=casino.count()
+	print(numofcasino)
 
 	spark.stop()
 	print('Done!')
