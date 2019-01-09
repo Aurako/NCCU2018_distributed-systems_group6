@@ -56,22 +56,38 @@ if __name__ == '__main__':
 	print(numofpersonal) #numbers of personal address
 
 
-	##pool=DT.where(size(col("outputs_output_pubkey_base58"))==0)
-	##pool=DT.filter(DT.outputs_output_pubkey_base58.like('\n%'))
 	pool=DT.filter((DT["outputs_output_pubkey_base58"] == "") | DT["outputs_output_pubkey_base58"].isNull() | isnan(DT["outputs_output_pubkey_base58"])).sort(desc("outputs_output_satoshis"))
 	pool=DT.filter((DT["inputs_input_pubkey_base58"] == "") | DT["inputs_input_pubkey_base58"].isNull() | isnan(DT["inputs_input_pubkey_base58"])).sort(desc("outputs_output_satoshis"))
 	pool=pool.filter((DT["outputs_output_satoshis"] >= 1250000000)&(DT["outputs_output_satoshis"] <= 1450000000))
-	pool=pool.groupBy("outputs_output_pubkey_base58").count().sort(desc("count"))
-	pool.show() #table of mining pool address and count
+	pool=pool.groupBy("outputs_output_pubkey_base58").count().sort(desc("count")) #table of mining pool address and count
+	pool=pool.selectExpr("outputs_output_pubkey_base58 as address")
+	pool.show() #only address
 	numofpool=pool.count()
 	print(numofpool) #numbers of mining pool address
 
-
-	casino=DT.where((lower(DT["outputs_output_pubkey_base58"]).like('1dice%')) | (lower(DT["outputs_output_pubkey_base58"]).like('%lucky%'))) #|(DT.inputs_input_pubkey_base58.like('1dice%')))
-	casino=casino.groupBy("outputs_output_pubkey_base58").count().sort(desc("count"))
-	casino.show()
+	casinoout=DT.where((lower(DT["outputs_output_pubkey_base58"]).like('1dice%')) | (lower(DT["outputs_output_pubkey_base58"]).like('1lucky%'))) #|(DT.inputs_input_pubkey_base58.like('1dice%')))
+	casinoout=casinoout.groupBy("outputs_output_pubkey_base58").count().sort(desc("count")) #table of casino address and count
+	casinoout=casinoout.selectExpr("outputs_output_pubkey_base58 as address")
+	casinoin=DT.where((lower(DT["inputs_input_pubkey_base58"]).like('1dice%')) | (lower(DT["inputs_input_pubkey_base58"]).like('1lucky%'))) #|(DT.inputs_input_pubkey_base58.like('1dice%')))
+	casinoin=casinoin.groupBy("inputs_input_pubkey_base58").count().sort(desc("count"))
+	casinoin=casinoin.selectExpr("inputs_input_pubkey_base58 as address")
+	casino=casinoin.union(casinoout)
+	casino=casino.distinct()
+	casino.show() #only address
 	numofcasino=casino.count()
-	print(numofcasino)
+	print(numofcasino) #numbers of casino address
+
+
+	alladdress=DT.select('outputs_output_pubkey_base58').union(DT.select('inputs_input_pubkey_base58'))
+	alladdress=alladdress.distinct()
+
+	servicesandexchange=personal.union(pool).union(casino)
+	servicesandexchange=servicesandexchange.distinct()
+	servicesandexchange=alladdress.subtract(servicesandexchange)
+	servicesandexchange=servicesandexchange.selectExpr("outputs_output_pubkey_base58 as address")
+	servicesandexchange.show()
+	numeofsande=servicesandexchange.count()
+	print(numeofsande) #numbers of service and exchange
 
 	spark.stop()
 	print('Done!')
