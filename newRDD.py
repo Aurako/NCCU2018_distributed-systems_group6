@@ -49,22 +49,6 @@ if __name__ == '__main__':
 	volumeavg=DT.select(func.avg("outputs_output_satoshis")).collect()
 	#print(volumeavg)
 
-	personal=numin.select('address').intersect(numout.select('address')) #pay<=4 and receipt<=6 and satoshi<=5683962
-	personal=personal.filter(~col('address').isin(['']))
-	personal.show() #table of personal address
-	numofpersonal=personal.count()
-	print(numofpersonal) #numbers of personal address
-
-
-	pool=DT.filter((DT["inputs_input_pubkey_base58"] == "") | DT["inputs_input_pubkey_base58"].isNull() | isnan(DT["inputs_input_pubkey_base58"])).sort(desc("outputs_output_satoshis"))
-	pool=pool.filter((DT["outputs_output_satoshis"] >= 1250000000)&(DT["outputs_output_satoshis"] <= 1450000000))
-	pool=pool.groupBy("outputs_output_pubkey_base58").count().sort(desc("count")) #table of mining pool address and count
-	pool=pool.selectExpr("outputs_output_pubkey_base58 as address")
-	pool=pool.filter(~col('address').isin(['']))
-	pool.show() #only address
-	numofpool=pool.count()
-	print(numofpool) #numbers of mining pool address
-
 	casinoout=DT.where((lower(DT["outputs_output_pubkey_base58"]).like('1dice%')) | (lower(DT["outputs_output_pubkey_base58"]).like('1lucky%'))) #|(DT.inputs_input_pubkey_base58.like('1dice%')))
 	casinoout=casinoout.groupBy("outputs_output_pubkey_base58").count().sort(desc("count")) #table of casino address and count
 	casinoout=casinoout.selectExpr("outputs_output_pubkey_base58 as address")
@@ -76,6 +60,26 @@ if __name__ == '__main__':
 	casino.show() #only address
 	numofcasino=casino.count()
 	print(numofcasino) #numbers of casino address
+
+	pool=DT.filter((DT["inputs_input_pubkey_base58"] == "") | DT["inputs_input_pubkey_base58"].isNull() | isnan(DT["inputs_input_pubkey_base58"])).sort(desc("outputs_output_satoshis"))
+	pool=pool.filter((DT["outputs_output_satoshis"] >= 1250000000)&(DT["outputs_output_satoshis"] <= 1450000000))
+	pool=pool.groupBy("outputs_output_pubkey_base58").count().sort(desc("count")) #table of mining pool address and count
+	pool=pool.selectExpr("outputs_output_pubkey_base58 as address")
+	pool=pool.subtract(casino)
+	pool=pool.filter(~col('address').isin(['']))
+	pool.show() #only address
+	numofpool=pool.count()
+	print(numofpool) #numbers of mining pool address
+
+	
+	casinonpool=pool.union(casino).distinct()
+	personal=numin.select('address').intersect(numout.select('address')) #pay<=4 and receipt<=6 and satoshi<=5683962
+	personal=personal.subtract(casinonpool)
+	personal=personal.filter(~col('address').isin(['']))
+	personal.show() #table of personal address
+	numofpersonal=personal.count()
+	print(numofpersonal) #numbers of personal address
+	
 
 	alladdress=DT.select('outputs_output_pubkey_base58').union(DT.select('inputs_input_pubkey_base58'))
 	alladdress=alladdress.distinct()
