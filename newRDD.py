@@ -6,7 +6,7 @@ import pyspark.sql.functions as func
 from pyspark.sql.types import IntegerType
 from pyspark.sql.functions import desc
 from pyspark.sql.functions import sum
-from pyspark.sql.functions import col,size,isnan
+from pyspark.sql.functions import col,size,isnan,lit
 from pyspark.sql.types import *
 from pyspark.sql.functions import lower
 
@@ -18,6 +18,9 @@ if __name__ == '__main__':
 	DT = sqlContext.createDataFrame(data = data.filter(lambda x:x[0]!='DTime'), schema=data.filter(lambda x:x[0]=='DTime').collect()[0])
 	DT = DT.withColumn('outputs_output_satoshis', DT['outputs_output_satoshis'].cast(IntegerType()))
 	DT.persist()
+
+	DTtype=type(DT)
+	print(DTtype)
 
 	choosevolume=DT.select("inputs_input_pubkey_base58","outputs_output_pubkey_base58","outputs_output_satoshis").sort(desc("outputs_output_satoshis"))# find out each record of satoshis<56839628
 	choosevolume=choosevolume.where("outputs_output_satoshis<=56839628")
@@ -49,6 +52,11 @@ if __name__ == '__main__':
 	volumeavg=DT.select(func.avg("outputs_output_satoshis")).collect()
 	#print(volumeavg)
 
+	alladdress=DT.select('outputs_output_pubkey_base58').union(DT.select('inputs_input_pubkey_base58'))
+	alladdress=alladdress.distinct()
+	numofalladdress=alladdress.count()
+	print(numofalladdress)
+
 	casinoout=DT.where((lower(DT["outputs_output_pubkey_base58"]).like('1dice%')) | (lower(DT["outputs_output_pubkey_base58"]).like('1lucky%'))) #|(DT.inputs_input_pubkey_base58.like('1dice%')))
 	casinoout=casinoout.groupBy("outputs_output_pubkey_base58").count().sort(desc("count")) #table of casino address and count
 	casinoout=casinoout.selectExpr("outputs_output_pubkey_base58 as address")
@@ -57,9 +65,6 @@ if __name__ == '__main__':
 	casinoin=casinoin.selectExpr("inputs_input_pubkey_base58 as casino")
 	casino=casinoin.union(casinoout)
 	casino=casino.distinct()
-	casino.show() #only address
-	numofcasino=casino.count()
-	print(numofcasino) #numbers of casino address
 
 	pool=DT.filter((DT["inputs_input_pubkey_base58"] == "") | DT["inputs_input_pubkey_base58"].isNull() | isnan(DT["inputs_input_pubkey_base58"])).sort(desc("outputs_output_satoshis"))
 	pool=pool.filter((DT["outputs_output_satoshis"] >= 1250000000)&(DT["outputs_output_satoshis"] <= 1450000000))
@@ -67,34 +72,44 @@ if __name__ == '__main__':
 	pool=pool.selectExpr("outputs_output_pubkey_base58 as miningpool")
 	pool=pool.subtract(casino)
 	pool=pool.filter(~col('miningpool').isin(['']))
-	pool.show() #only address
-	numofpool=pool.count()
-	print(numofpool) #numbers of mining pool address
-
 	
 	casinonpool=pool.union(casino).distinct()
 	personal=numin.select('address').intersect(numout.select('address')) #pay<=4 and receipt<=6 and satoshi<=5683962
 	personal=personal.subtract(casinonpool)
 	personal=personal.filter(~col('address').isin(['']))
 	personal=personal.selectExpr("address as personal")
-	personal.show() #table of personal address
-	numofpersonal=personal.count()
-	print(numofpersonal) #numbers of personal address
-	
-	alladdress=DT.select('outputs_output_pubkey_base58').union(DT.select('inputs_input_pubkey_base58'))
-	alladdress=alladdress.distinct()
-	
+
 	servicesandexchange=personal.union(pool).union(casino)
 	servicesandexchange=servicesandexchange.distinct()
 	servicesandexchange=alladdress.subtract(servicesandexchange)
 	servicesandexchange=servicesandexchange.selectExpr("outputs_output_pubkey_base58 as servicesandexchange")
 	servicesandexchange=servicesandexchange.filter(~col('servicesandexchange').isin(['']))
-	servicesandexchange.show()
-	numeofsande=servicesandexchange.count()
-	print(numeofsande) #numbers of service and exchange
 
-	numofalladdress=alladdress.count()
-	print(numofalladdress)
+	casino=casino.withColumn("class",lit("casino"))
+	#casino.show() #only address
+	numofcasino=casino.count()
+	#print(numofcasino) #numbers of casino address
+
+	pool=pool.withColumn("class",lit("mining_pool"))
+	#pool.show() #only address
+	numofpool=pool.count()
+	#print(numofpool) #numbers of mining pool address
+
+	personal=personal.withColumn("class",lit("personal"))
+	#personal.show() #table of personal address
+	numofpersonal=personal.count()
+	#print(numofpersonal) #numbers of personal address
+
+	servicesandexchange=servicesandexchange.withColumn("class",lit("services_and_exchange"))
+	#servicesandexchange.show()
+	numeofsande=servicesandexchange.count()
+	#print(numeofsande) #numbers of service and exchange
+	
+	final=casino.union(pool).union(personal).union(servicesandexchange)
+	final=final.selectExpr("casino as address","class as class")
+	final.show()
+	print(final.count())
+
 
 	spark.stop()
 	print('Done!')
